@@ -12,7 +12,7 @@ print(logger)"""
 logfile = str(datetime.date.today()) + '.log'
 
 
-token="6135983250:AAG93EBQtWSp65mB9DNhid3kI9DXGOX4IEU"
+token=""
 bot=telebot.TeleBot(token)
 HELP="""
 * Справка о командах-вывести справку по программе
