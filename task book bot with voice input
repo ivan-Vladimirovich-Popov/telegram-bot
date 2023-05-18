@@ -1,0 +1,322 @@
+import telebot
+import requests
+import random
+import speech_recognition as sr
+import os
+import datetime
+import subprocess
+"""import logging
+logger=telebot.logger
+telebot.logger.setLevel(logging.DEBUG)
+print(logger)"""
+logfile = str(datetime.date.today()) + '.log'
+
+
+token="6135983250:AAG93EBQtWSp65mB9DNhid3kI9DXGOX4IEU"
+bot=telebot.TeleBot(token)
+HELP="""
+* Справка о командах-вывести справку по программе
+* Добавить задачу- добавить задачу\n в формате(/add дата-%%.%%.%% "текст задачи")
+* Показать задачи -вывести задачи касательно даты\n в формате(/show дата-%%.%%.%%)
+* Показать все задачи-вывести все задачи
+* Добавить рандомную задачу-добавить рандомную задачу на сегодня
+* Выход из программы-выход из программы
+"""
+HELP_VOICE="""
+* Справка о командах-произнеси "справка по голосовым"
+* Добавить задачу- произнеси- "добавь на дату 11.11.2011 задачу "текст задачи"
+* Показать задачи - произнеси- "Посмотреть задачи на дату 11.11.2011"
+* Удалить задачу-произнеси-"Удалить с даты 11.11.2011 задачу номер "номер задачи начиная с 0"
+* Удалить дату и задачу-произнеси "Стереть дату 11.11.2011 "
+* Показать все задачи- произнеси -Показать все задачи
+* Добавить случайную задачу-произнеси случайная задача
+* Выход из программы- произнеси Выйти или закончить
+
+!!!!!Остальными командами мы будем тебя дразнить!!!!!
+"""
+greetings="Привет дорогой друг\nМеня зовут Бот\nРасскажи о своих делах\nИ я помогу тебе не забыть о чем то важном:)\nЕсли что я понимаю и голосовухи\nВызови справку по ним если хочешь"
+tasks={}
+rand_todo=["Заняться спортом","Совершить прогулку","Заняться самообучением","Провести время с семьей"]
+data_time=datetime.datetime.now()
+dt=data_time.strftime("%d.%m.%Y")
+f_data="\nФормат ввода:\n(/show 11.11.2011)"
+f_add="\nФормат ввода:\n(11.11.2023 текст задачи)"
+Cm=True
+
+def add_todo(message):
+    try:
+        data,task=message.text.split(maxsplit=1)
+        if data in tasks:
+            tasks[data].append(task)
+        else:
+            tasks[data] = []
+            tasks[data].append(task)
+        bot.send_message(message.chat.id,f"задача {task} добавленна на дату {data}")
+    except ValueError:
+        bot.send_message(message.chat.id,"Возникла ошибочка\nНо ты не лох!Попробуй снова")
+    except AttributeError:
+        bot.send_message(message.chat.id, "Возникла ошибочка\nНо ты не лох!Попробуй снова")
+
+def show(message):
+    data = message.text
+    if data in tasks:
+        text = f"{data}\n"
+        for task in tasks[data]:
+            text = f"{text} - {task}\n"
+    else:
+        text = "Такой даты еще нет"
+    bot.send_message(message.chat.id, text)
+
+def random_todo(message):
+    data = dt
+    task = random.choice(rand_todo)
+    if data in tasks:
+        tasks[data].append(task)
+    else:
+        tasks[data] = []
+        tasks[data].append(task)
+    bot.send_message(message.chat.id, f"задача {task} добавленна на дату {data}")
+
+def show_all(message):
+    k=[]
+    if len(tasks) > 0:
+        for key in tasks:
+            t = (f"{key}-{tasks[key]}")
+            k.append(t)
+    else:
+        k= "Список задач пуст"
+    if "Список" in k:
+        bot.send_message(message.chat.id, "".join(map(str, k)))
+    else:
+        bot.send_message(message.chat.id, "\n".join(map(str, k)))
+
+def del_todo(message):
+    try:
+        ms= message.text.split(maxsplit=1)
+        data=ms[0]
+        num=int(ms[1])
+        if data in tasks:
+            if len(tasks[data])>1:
+                try:
+                    del tasks[data][num-1]
+                    bot.send_message(message.chat.id, "Задача удаленна")
+                except IndexError:
+                    bot.send_message(message.chat.id, "Чет ошибка вышла\nпопробуй еще раз")
+            else:
+                del_all(message)
+        else:
+            text = "Такой даты еще нет"
+            bot.send_message(message.chat.id, text)
+    except ValueError:
+        bot.send_message(message.chat.id,"Чет ошибка вышла\nпопробуй еще раз")
+
+def del_all(message):
+    ms= message.text.split()
+    data=ms[0]
+    if data in tasks:
+        del tasks[data]
+        bot.send_message(message.chat.id,"Задачи удаленны")
+    else:
+        text = "Такой даты еще нет"
+        bot.send_message(message.chat.id, text)
+
+def exit_todo(message):
+    exit(0)
+
+def add_todo_voice(message):
+    try:
+        ms=message.split(maxsplit=5)
+        data=ms[3]
+        task=ms[5]
+        if data:
+            if data in tasks:
+                tasks[data].append(task)
+            else:
+                tasks[data] = []
+                tasks[data].append(task)
+            res1=f"задача {task} добавленна на дату {data}"
+            return res1
+        else:
+            res1="ошибка"
+            return res1
+    except ValueError:
+        res1="Возникла ошибочка\nНо ты не лох!Попробуй снова"
+        return res1
+
+def show_voice(message):
+    ms=message.split(maxsplit=5)
+    data=ms[4]
+    if data in tasks:
+        text = f"{data}\n"
+        for task in tasks[data]:
+            res1 = f"{text} - {task}\n"
+            return res1
+    else:
+        res1 = "Такой даты еще нет"
+        return res1
+
+def show_all_voice(message):
+    result=[]
+    if len(tasks) > 0:
+        for key in tasks:
+            t = (f"{key}-{tasks[key]}")
+            result.append(t)
+    else:
+        result= "Список задач пуст"
+    return result
+
+def help_voice(message):
+    result=HELP_VOICE
+    return result
+
+def exit_todo_voice(message):
+    exit(0)
+
+def del_voice(message):
+    try:
+        ms= message.split(maxsplit=6)
+        data=ms[3]
+        num1=ms[6]
+        num=num1[1]
+        if data in tasks:
+            if len(tasks[data])>1:
+                try:
+                    del tasks[data][num-1]
+                    result="Задача удаленна"
+                    return result
+                except IndexError:
+                    result="Чет ошибка вышла\nпопробуй еще раз"
+                    return result
+            else:
+                del_all_voice(message)
+        else:
+            result = "Такой даты еще нет"
+            return result
+    except ValueError:
+        result = "Чет ошибка вышла\nпопробуй еще раз"
+        return result
+
+def del_all_voice(message):
+    ms= message.text.split()
+    data=ms[0]
+    if data in tasks:
+        del tasks[data]
+        result = "Задача удаленна"
+        return result
+    else:
+        result = "Такой даты еще нет"
+        return result
+
+def audio_to_text(dest_name: str):
+# Функция для перевода аудио, в формате ".vaw" в текст
+    r = sr.Recognizer() # такое вообще надо комментить?
+    # тут мы читаем наш .vaw файл
+    message = sr.AudioFile(dest_name)
+    with message as source:
+        audio = r.record(source)
+    result = r.recognize_google(audio, language="ru_RU") # используя возможности библиотеки распознаем текст, так же тут можно изменять язык распознавания
+    return result
+
+@bot.message_handler(commands=["start"])
+def button_message(message):
+    markup = telebot.types.ReplyKeyboardMarkup()
+    button2 = telebot.types.KeyboardButton("справка о командах")
+    button3=telebot.types.KeyboardButton("справка о голосовых командах")
+    button4 = telebot.types.KeyboardButton('показать задачу по дате')
+    button5=telebot.types.KeyboardButton("показать все задачи")
+    button6 = telebot.types.KeyboardButton("добавить задачу")
+    button7=telebot.types.KeyboardButton("добавить случайную задачу")
+    button8=telebot.types.KeyboardButton("удалить задачу")
+    button9=telebot.types.KeyboardButton("удалить дату и задачи")
+    button10 = telebot.types.KeyboardButton('выход из программы')
+    markup.row(button2,button3)
+    markup.row(button4,button5)
+    markup.row(button6,button7)
+    markup.row(button8,button9)
+    markup.row(button10)
+    bot.send_message(message.chat.id,greetings,reply_markup=markup)
+
+@bot.message_handler(content_types=["text"])#текстовая часть
+def callback_worker(message):
+    if message.text=="справка о командах":
+        bot.send_message(message.chat.id, HELP)
+    elif message.text=="выход из программы":
+        m1=bot.send_message(message.chat.id, "До скорых встреч")
+        bot.register_next_step_handler(m1,exit_todo)
+    elif message.text== "добавить задачу":
+        m1=bot.send_message(message.chat.id,f"Введите дату и задачу\n{f_add}")
+        bot.register_next_step_handler(m1,add_todo)
+    elif message.text == "показать задачу по дате":
+        m1 = bot.send_message(message.chat.id, f"Введите дату\n{f_data}")
+        bot.register_next_step_handler(m1, show)
+    elif message.text=="показать все задачи":
+        show_all(message)
+    elif message.text=="добавить случайную задачу":
+        random_todo(message)
+    elif message.text=="справка о голосовых командах":
+        bot.send_message(message.chat.id,HELP_VOICE)
+    elif message.text=="удалить дату и задачи":
+        m1=bot.send_message(message.chat.id,"введите дату для удаления ")
+        bot.register_next_step_handler(m1,del_all)
+    elif message.text=="удалить задачу":
+        m1=bot.send_message(message.chat.id,"Введите дату и\nпорядковый номер для удаления")
+        bot.register_next_step_handler(m1,del_todo)
+    elif message.text.lower()=="привет":
+        bot.send_message(message.chat.id,greetings)
+    else:
+        bot.send_message(message.chat.id,"Божечки-кошечки\nЗачем же ты так со мной поступил\nДавай начнем все сначала")
+
+@bot.message_handler(content_types=["voice"])#голосовая часть
+def get_audio_messages(message):
+# Основная функция, принимает голосовуху от пользователя
+    try:
+        print("Started recognition...")
+        # Ниже пытаемся вычленить имя файла, да и вообще берем данные с мессаги
+        file_info = bot.get_file(message.voice.file_id)
+        path = file_info.file_path # Вот тут-то и полный путь до файла (например: voice/file_2.oga)
+        fname = os.path.basename(path) # Преобразуем путь в имя файла (например: file_2.oga)
+        doc = requests.get('https://api.telegram.org/file/bot{0}/{1}'.format(token, file_info.file_path)) # Получаем и сохраняем присланную голосвуху (Ага, админ может в любой момент отключить удаление айдио файлов и слушать все, что ты там говоришь. А представь, что такую бяку подселят в огромный чат и она будет просто логировать все сообщения [анонимность в телеграмме, ахахаха])
+        with open(fname+'.oga', 'wb') as f:
+            f.write(doc.content) # вот именно тут и сохраняется сама аудио-мессага
+        process = subprocess.run(['ffmpeg', '-i',fname+'.oga', fname+'.wav'])# здесь используется страшное ПО ffmpeg, для конвертации .oga в .vaw
+        result = audio_to_text(fname+'.wav') # Вызов функции для перевода аудио в текст
+        if "добавь" in result.lower():
+            result=add_todo_voice(result)
+            bot.send_message(message.from_user.id, format(result))
+        elif "посмотреть" in result.lower():
+            result=show_voice(result)
+            bot.send_message(message.from_user.id, format(result))
+        elif "показать"  in result.lower():
+            result=show_all_voice(result)
+            bot.send_message(message.from_user.id, format(result))
+        elif "закончить" in result.lower():
+            bot.send_message(message.from_user.id, "До скорых встреч\nПрограмма завершена")
+            bot.stop_bot()
+        elif "справка" in result.lower():
+            bot.send_message(message.from_user.id, HELP_VOICE)
+        elif "удали" in result.lower():
+            result=del_voice(result)
+            bot.send_message(message.from_user.id, format(result))
+        elif "стереть" in result.lower():
+            result=del_all_voice(result)
+            bot.send_message(message.from_user.id, format(result))
+        else:
+            bot.send_message(message.from_user.id, format(result))
+    except sr.UnknownValueError as e:
+        # Ошибка возникает, если сообщение не удалось разобрать. В таком случае отсылается ответ пользователю и заносим запись в лог ошибок
+        bot.send_message(message.from_user.id,  "Прошу прощения, но я не разобрал сообщение, или оно поустое...")
+        with open("log_bot/"+logfile, 'a', encoding='utf-8') as f:
+            f.write(str(datetime.datetime.today().strftime("%H:%M:%S")) + ':' + str(message.from_user.id) + ':' + str(message.from_user.first_name) + '_' + str(message.from_user.last_name) + ':' + str(message.from_user.username) +':'+ str(message.from_user.language_code) + ':Message is empty.\n')
+    except Exception as e:
+        # В случае возникновения любой другой ошибки, отправляется соответствующее сообщение пользователю и заносится запись в лог ошибок
+        bot.send_message(message.from_user.id,  "Что-то пошло через жопу, но наши смелые инженеры уже трудятся над решением... \nДа ладно, никто эту ошибку исправлять не будет, она просто потеряется в логах.")
+        with open("log_bot/"+logfile, 'a', encoding='utf-8') as f:
+            f.write(str(datetime.datetime.today().strftime("%H:%M:%S")) + ':' + str(message.from_user.id) + ':' + str(message.from_user.first_name) + '_' + str(message.from_user.last_name) + ':' + str(message.from_user.username) +':'+ str(message.from_user.language_code) +':' + str(e) + '\n')
+
+    finally:
+        # В любом случае удаляем временные файлы с аудио сообщением
+        os.remove(fname+'.wav')
+        os.remove(fname+'.oga')
+
+
+bot.polling(none_stop=Cm, interval=0)
